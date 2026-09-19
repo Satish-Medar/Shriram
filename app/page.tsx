@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import ReportForm from "@/components/ReportForm";
 
@@ -10,8 +10,18 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
+    const client = supabase;
+
+    if (!isSupabaseConfigured || !client) {
+      setIsLoading(false);
+      router.replace("/login");
+      return;
+    }
+
     const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await client.auth.getSession();
       if (!session) {
         router.push("/login");
       } else {
@@ -22,8 +32,9 @@ export default function Home() {
 
     checkUser();
 
-    // Listen for auth changes (like signing out)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = client.auth.onAuthStateChange((_event, session) => {
       if (!session) {
         router.push("/login");
       } else {
@@ -35,8 +46,25 @@ export default function Home() {
   }, [router]);
 
   const handleSignOut = async () => {
+    if (!supabase) return;
     await supabase.auth.signOut();
   };
+
+  if (!isSupabaseConfigured) {
+    return (
+      <main className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-white rounded-2xl border border-gray-200 p-6 shadow-sm text-center">
+          <h1 className="text-xl font-bold text-gray-900">
+            Supabase not configured
+          </h1>
+          <p className="mt-3 text-sm text-gray-600">
+            Add your NEXT_PUBLIC_SUPABASE_URL and
+            NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY values to continue.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -52,17 +80,19 @@ export default function Home() {
     <main className="min-h-screen bg-gray-50 pt-6">
       <div className="max-w-2xl mx-auto px-4 mb-6 flex justify-between items-start">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Daily Business Report</h1>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Daily Business Report
+          </h1>
           <p className="text-gray-500 text-sm mt-1">{user.email}</p>
         </div>
-        <button 
+        <button
           onClick={handleSignOut}
           className="text-sm bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-300 transition-colors"
         >
           Sign Out
         </button>
       </div>
-      
+
       <ReportForm />
     </main>
   );
