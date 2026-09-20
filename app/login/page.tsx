@@ -11,7 +11,6 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
-  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [message, setMessage] = useState({ text: "", isError: false });
@@ -42,19 +41,7 @@ export default function Login() {
     setMessage({ text: "", isError: false });
 
     try {
-      if (isForgotPassword) {
-        const siteUrl =
-          process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${siteUrl}/reset-password`,
-          captchaToken,
-        });
-        if (error) throw error;
-        setMessage({
-          text: "If an account exists for that email, you will receive a password reset link.",
-          isError: false,
-        });
-      } else if (isLogin) {
+      if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
@@ -91,9 +78,7 @@ export default function Login() {
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-gray-900">Branch Portal</h1>
           <p className="text-gray-500 text-sm mt-1">
-            {isForgotPassword
-              ? "We will send you a secure reset link"
-              : "Sign in to manage your daily reports"}
+            Sign in to manage your daily reports
           </p>
         </div>
 
@@ -126,31 +111,29 @@ export default function Login() {
               placeholder="you@branch.com"
             />
           </div>
-          {!isForgotPassword && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Password
-              </label>
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  required
-                  disabled={!isSupabaseConfigured}
-                  className="w-full p-3 pr-12 border rounded-lg bg-gray-50 text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-60"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                </button>
-              </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Password
+            </label>
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                required
+                disabled={!isSupabaseConfigured}
+                className="w-full p-3 pr-12 border rounded-lg bg-gray-50 text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-60"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
             </div>
-          )}
+          </div>
 
           {captchaSiteKey && (
             <HCaptcha
@@ -180,50 +163,21 @@ export default function Login() {
             }
             className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium shadow-sm hover:bg-blue-700 transition-colors disabled:opacity-50"
           >
-            {loading
-              ? "Processing..."
-              : isForgotPassword
-                ? "Send reset link"
-                : isLogin
-                  ? "Sign In"
-                  : "Create Account"}
+            {loading ? "Processing..." : isLogin ? "Sign In" : "Create Account"}
           </button>
         </form>
 
-        {isLogin && !isForgotPassword && (
-          <div className="mt-4 text-center">
-            <button
-              type="button"
-              onClick={() => {
-                setIsForgotPassword(true);
-                setMessage({ text: "", isError: false });
-              }}
-              className="text-sm text-blue-600 hover:underline"
-            >
-              Forgot your password?
-            </button>
-          </div>
-        )}
-
         <div className="mt-6 text-center">
           <button
-            type="button"
             onClick={() => {
-              if (isForgotPassword) {
-                setIsForgotPassword(false);
-                setIsLogin(true);
-              } else {
-                setIsLogin(!isLogin);
-              }
+              setIsLogin(!isLogin);
               setMessage({ text: "", isError: false });
             }}
             className="text-sm text-blue-600 hover:underline"
           >
-            {isForgotPassword
-              ? "Back to sign in"
-              : isLogin
-                ? "Need an account? Sign up"
-                : "Already have an account? Sign in"}
+            {isLogin
+              ? "Need an account? Sign up"
+              : "Already have an account? Sign in"}
           </button>
         </div>
       </div>

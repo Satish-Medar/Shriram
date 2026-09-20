@@ -26,8 +26,6 @@ NEXT_PUBLIC_SITE_URL=https://your-project.vercel.app
 
 Add the same URL with `/login` to Supabase **Authentication > URL Configuration > Redirect URLs**, then add `NEXT_PUBLIC_SITE_URL` to the Vercel project environment variables and redeploy.
 
-For password recovery, also add the same URL with `/reset-password` to the Supabase redirect URLs. Users can select **Forgot your password?** on the login page, then follow the emailed link to set a new password.
-
 ## CAPTCHA protection
 
 Create an hCaptcha site and copy its site key. Add the public site key to the Vercel environment variables:
