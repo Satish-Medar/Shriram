@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   calculateDaySanction,
   calculateDayNetGrowth,
@@ -12,6 +12,8 @@ import {
   generateReport2Text,
 } from "@/lib/reportGenerator";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+
+const DRAFT_STORAGE_PREFIX = "daily-business-report-draft:";
 
 const INITIAL_FORM_STATE = {
   date: new Date().toISOString().split("T")[0],
@@ -189,6 +191,9 @@ const Report2Row = ({
 
 export default function ReportForm() {
   const [formData, setFormData] = useState(INITIAL_FORM_STATE);
+  const [draftStorageKey, setDraftStorageKey] = useState<string | null>(null);
+  const [isDraftHydrated, setIsDraftHydrated] = useState(false);
+  const skipNextDraftSave = useRef(false);
 
   const [derived, setDerived] = useState({
     totalFresh: 0,
@@ -221,6 +226,7 @@ export default function ReportForm() {
       if (!isSupabaseConfigured || !supabase) {
         setIsMounted(true);
         setShowMtdInputs(true);
+        setIsDraftHydrated(true);
         return;
       }
 
@@ -229,7 +235,21 @@ export default function ReportForm() {
       } = await supabase.auth.getUser();
       if (!user) {
         setIsMounted(true);
+        setIsDraftHydrated(true);
         return;
+      }
+
+      const storageKey = `${DRAFT_STORAGE_PREFIX}${user.id}`;
+      setDraftStorageKey(storageKey);
+
+      let savedDraft: Partial<typeof INITIAL_FORM_STATE> | null = null;
+      try {
+        const rawDraft = window.localStorage.getItem(storageKey);
+        if (rawDraft) {
+          savedDraft = JSON.parse(rawDraft);
+        }
+      } catch (error) {
+        console.warn("Unable to restore saved draft:", error);
       }
 
       const { data, error } = await supabase
@@ -278,6 +298,7 @@ export default function ReportForm() {
           prevMonthRenewal: newPrevRenewal,
           prevMonthRedemption: newPrevRedemption,
           prevPjbtData: newPrevPjbt,
+          ...savedDraft,
         }));
 
         // Only show the box if the calculated DB totals are absolutely 0
@@ -293,12 +314,31 @@ export default function ReportForm() {
       } else {
         // No reports found in DB at all (First day using the app)
         setShowMtdInputs(true);
+        if (savedDraft) {
+          setFormData((prev) => ({ ...prev, ...savedDraft }));
+        }
       }
       setIsMounted(true);
+      setIsDraftHydrated(true);
     }
 
     loadUserData();
   }, []);
+
+  useEffect(() => {
+    if (!isDraftHydrated || !draftStorageKey) return;
+
+    if (skipNextDraftSave.current) {
+      skipNextDraftSave.current = false;
+      return;
+    }
+
+    try {
+      window.localStorage.setItem(draftStorageKey, JSON.stringify(formData));
+    } catch (error) {
+      console.warn("Unable to save report draft:", error);
+    }
+  }, [draftStorageKey, formData, isDraftHydrated]);
 
   // AUTO-CALCULATIONS
   useEffect(() => {
@@ -436,6 +476,15 @@ export default function ReportForm() {
         .upsert(dbRecord, { onConflict: "user_id, date" });
 
       if (error) throw error;
+
+      if (draftStorageKey) {
+        try {
+          window.localStorage.removeItem(draftStorageKey);
+        } catch (error) {
+          console.warn("Unable to clear saved draft:", error);
+        }
+      }
+      skipNextDraftSave.current = true;
 
       setShowMtdInputs(false);
 

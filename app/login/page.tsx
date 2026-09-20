@@ -53,7 +53,7 @@ export default function Login() {
       } else {
         const siteUrl =
           process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -62,10 +62,21 @@ export default function Login() {
           },
         });
         if (error) throw error;
-        setMessage({ text: "Success! You can now sign in.", isError: false });
+        setMessage({
+          text: data.session
+            ? "Account created successfully. You can now sign in."
+            : "Account created. Check your email and confirm your account before signing in.",
+          isError: false,
+        });
       }
     } catch (error: any) {
-      setMessage({ text: error.message || "An error occurred", isError: true });
+      const errorMessage =
+        error.message === "Invalid login credentials"
+          ? "Invalid email or password. If you just created your account, confirm it from the email sent by Supabase first."
+          : error.message === "email rate limit exceeded"
+            ? "Email sending is temporarily limited. Please try again later, or ask the administrator to configure production SMTP."
+            : error.message || "An error occurred";
+      setMessage({ text: errorMessage, isError: true });
     } finally {
       captcha.current?.resetCaptcha();
       setCaptchaToken(null);
