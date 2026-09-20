@@ -768,7 +768,7 @@ export default function ReportForm() {
           </h3>
           <div className="flex justify-between text-sm">
             <span className="text-gray-600">New MTD Sanction:</span>
-            <span className="font-semibold">
+            <span className="font-semibold text-gray-900">
               {formatIndianCurrency(derived.monthSanction)}
             </span>
           </div>
