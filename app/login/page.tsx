@@ -36,7 +36,15 @@ export default function Login() {
         if (error) throw error;
         router.push("/");
       } else {
-        const { error } = await supabase.auth.signUp({ email, password });
+        const siteUrl =
+          process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: `${siteUrl}/login`,
+          },
+        });
         if (error) throw error;
         setMessage({ text: "Success! You can now sign in.", isError: false });
       }

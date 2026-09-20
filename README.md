@@ -16,6 +16,16 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Supabase email verification
+
+Set `NEXT_PUBLIC_SITE_URL` to the public URL where the app is deployed, for example:
+
+```env
+NEXT_PUBLIC_SITE_URL=https://your-project.vercel.app
+```
+
+Add the same URL with `/login` to Supabase **Authentication > URL Configuration > Redirect URLs**, then add `NEXT_PUBLIC_SITE_URL` to the Vercel project environment variables and redeploy.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
