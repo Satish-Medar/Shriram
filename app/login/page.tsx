@@ -73,7 +73,7 @@ export default function Login() {
               type="email"
               required
               disabled={!isSupabaseConfigured}
-              className="w-full p-3 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-60"
+              className="w-full p-3 border rounded-lg bg-gray-50 text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-60"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@branch.com"
@@ -88,7 +88,7 @@ export default function Login() {
                 type={showPassword ? "text" : "password"}
                 required
                 disabled={!isSupabaseConfigured}
-                className="w-full p-3 pr-12 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-60"
+                className="w-full p-3 pr-12 border rounded-lg bg-gray-50 text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-60"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
