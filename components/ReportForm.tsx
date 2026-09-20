@@ -120,12 +120,14 @@ const Report2Row = ({
   amountKey,
   formData,
   setFormData,
+  readOnly = false,
 }: {
   label: string;
   caseKey: string;
   amountKey: string;
   formData: any;
   setFormData: any;
+  readOnly?: boolean;
 }) => {
   const values = formData[amountKey] as string[];
   return (
@@ -151,9 +153,11 @@ const Report2Row = ({
           <div key={index} className="flex gap-2">
             <input
               type="number"
-              className="w-full p-3 border rounded-lg bg-gray-50 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              readOnly={readOnly}
+              className={`w-full p-3 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${readOnly ? "bg-gray-100 text-gray-900" : "bg-gray-50"}`}
               value={amount}
               onChange={(e) => {
+                if (readOnly) return;
                 const newList = [...values];
                 newList[index] = e.target.value;
                 setFormData({ ...formData, [amountKey]: newList });
@@ -176,14 +180,16 @@ const Report2Row = ({
             )}
           </div>
         ))}
-        <button
-          onClick={() =>
-            setFormData({ ...formData, [amountKey]: [...values, ""] })
-          }
-          className="text-xs font-semibold text-blue-600 hover:text-blue-700"
-        >
-          + Add amount
-        </button>
+        {!readOnly && (
+          <button
+            onClick={() =>
+              setFormData({ ...formData, [amountKey]: [...values, ""] })
+            }
+            className="text-xs font-semibold text-blue-600 hover:text-blue-700"
+          >
+            + Add amount
+          </button>
+        )}
       </div>
     </div>
   );
@@ -404,6 +410,17 @@ export default function ReportForm() {
       newBalance !== formData.expiredBalance
     ) {
       setFormData((prev) => ({ ...prev, expiredBalance: newBalance }));
+    }
+
+    const daySanctionAmount = String(sanction);
+    if (
+      formData.goldAmount.length !== 1 ||
+      formData.goldAmount[0] !== daySanctionAmount
+    ) {
+      setFormData((prev) => ({
+        ...prev,
+        goldAmount: [daySanctionAmount],
+      }));
     }
   }, [formData]);
 
@@ -1016,6 +1033,7 @@ export default function ReportForm() {
             amountKey="goldAmount"
             formData={formData}
             setFormData={setFormData}
+            readOnly
           />
         </div>
         <div className="pt-4 mt-4 border-t border-gray-200 space-y-3">
