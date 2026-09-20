@@ -1,8 +1,10 @@
 "use client";
 import { useState } from "react";
+import { useRef } from "react";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
+import HCaptcha from "@hcaptcha/react-hcaptcha";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -10,7 +12,10 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [message, setMessage] = useState({ text: "", isError: false });
+  const captcha = useRef<HCaptcha>(null);
+  const captchaSiteKey = process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY;
   const router = useRouter();
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -24,6 +29,14 @@ export default function Login() {
       return;
     }
 
+    if (!captchaSiteKey || !captchaToken) {
+      setMessage({
+        text: "Please complete the CAPTCHA before continuing.",
+        isError: true,
+      });
+      return;
+    }
+
     setLoading(true);
     setMessage({ text: "", isError: false });
 
@@ -32,6 +45,7 @@ export default function Login() {
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
+          options: { captchaToken },
         });
         if (error) throw error;
         router.push("/");
@@ -43,6 +57,7 @@ export default function Login() {
           password,
           options: {
             emailRedirectTo: `${siteUrl}/login`,
+            captchaToken,
           },
         });
         if (error) throw error;
@@ -51,6 +66,8 @@ export default function Login() {
     } catch (error: any) {
       setMessage({ text: error.message || "An error occurred", isError: true });
     } finally {
+      captcha.current?.resetCaptcha();
+      setCaptchaToken(null);
       setLoading(false);
     }
   };
@@ -69,6 +86,13 @@ export default function Login() {
           <div className="mb-5 rounded-lg bg-yellow-50 border border-yellow-200 p-3 text-sm text-yellow-800">
             Supabase environment variables are missing. The app is running in
             local-safe mode.
+          </div>
+        )}
+
+        {!captchaSiteKey && isSupabaseConfigured && (
+          <div className="mb-5 rounded-lg bg-yellow-50 border border-yellow-200 p-3 text-sm text-yellow-800">
+            CAPTCHA is not configured. Add NEXT_PUBLIC_HCAPTCHA_SITE_KEY to
+            enable sign in.
           </div>
         )}
 
@@ -111,6 +135,16 @@ export default function Login() {
             </div>
           </div>
 
+          {captchaSiteKey && (
+            <HCaptcha
+              ref={captcha}
+              sitekey={captchaSiteKey}
+              onVerify={(token) => setCaptchaToken(token)}
+              onExpire={() => setCaptchaToken(null)}
+              onError={() => setCaptchaToken(null)}
+            />
+          )}
+
           {message.text && (
             <div
               className={`p-3 rounded-lg text-sm ${message.isError ? "bg-red-50 text-red-600" : "bg-green-50 text-green-600"}`}
@@ -121,7 +155,12 @@ export default function Login() {
 
           <button
             type="submit"
-            disabled={loading || !isSupabaseConfigured}
+            disabled={
+              loading ||
+              !isSupabaseConfigured ||
+              !captchaSiteKey ||
+              !captchaToken
+            }
             className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium shadow-sm hover:bg-blue-700 transition-colors disabled:opacity-50"
           >
             {loading ? "Processing..." : isLogin ? "Sign In" : "Create Account"}

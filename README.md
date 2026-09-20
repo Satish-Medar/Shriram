@@ -26,6 +26,16 @@ NEXT_PUBLIC_SITE_URL=https://your-project.vercel.app
 
 Add the same URL with `/login` to Supabase **Authentication > URL Configuration > Redirect URLs**, then add `NEXT_PUBLIC_SITE_URL` to the Vercel project environment variables and redeploy.
 
+## CAPTCHA protection
+
+Create an hCaptcha site and copy its site key. Add the public site key to the Vercel environment variables:
+
+```env
+NEXT_PUBLIC_HCAPTCHA_SITE_KEY=your-hcaptcha-site-key
+```
+
+In Supabase, open **Authentication > Bot and Abuse Protection**, enable CAPTCHA protection, select hCaptcha, and enter the hCaptcha secret key. Keep the secret key in Supabase only; do not add it to the frontend or expose it with a `NEXT_PUBLIC_` variable.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
