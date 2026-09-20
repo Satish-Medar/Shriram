@@ -139,11 +139,13 @@ const Report2Row = ({
         <input
           type="number"
           min="0"
-          className="w-full p-3 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500 outline-none mt-1"
+          readOnly={readOnly}
+          className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none mt-1 ${readOnly ? "bg-gray-100 text-gray-900" : "bg-gray-50"}`}
           value={(formData as any)[caseKey] || ""}
-          onChange={(e) =>
-            setFormData({ ...formData, [caseKey]: Number(e.target.value) })
-          }
+          onChange={(e) => {
+            if (readOnly) return;
+            setFormData({ ...formData, [caseKey]: Number(e.target.value) });
+          }}
           onWheel={(e) => (e.target as HTMLInputElement).blur()}
           placeholder="Cases"
         />
@@ -351,6 +353,9 @@ export default function ReportForm() {
     const totalFresh = sumAmountList(formData.freshBusiness);
     const totalRenewal = sumAmountList(formData.renewalBusiness);
     const totalRedemption = sumAmountList(formData.glRedemption);
+    const freshBusinessCases = formData.freshBusiness.filter(
+      (amount: string) => amount.trim() !== "",
+    ).length;
 
     const sanction = calculateDaySanction(totalFresh, totalRenewal);
     const netGrowth = calculateDayNetGrowth(sanction, totalRedemption);
@@ -377,7 +382,7 @@ export default function ReportForm() {
       },
       { cases: formData.splCases, amount: sumAmountList(formData.splAmount) },
       { cases: formData.csplCases, amount: sumAmountList(formData.csplAmount) },
-      { cases: formData.goldCases, amount: sumAmountList(formData.goldAmount) },
+      { cases: freshBusinessCases, amount: sumAmountList(formData.goldAmount) },
     ]);
 
     let newBalance = formData.expiredBalance;
@@ -420,6 +425,13 @@ export default function ReportForm() {
       setFormData((prev) => ({
         ...prev,
         goldAmount: [daySanctionAmount],
+      }));
+    }
+
+    if (formData.goldCases !== freshBusinessCases) {
+      setFormData((prev) => ({
+        ...prev,
+        goldCases: freshBusinessCases,
       }));
     }
   }, [formData]);
