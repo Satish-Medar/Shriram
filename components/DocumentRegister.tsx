@@ -133,6 +133,7 @@ export default function DocumentRegister({
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
+  const [activePanel, setActivePanel] = useState<"form" | "records">("form");
 
   useEffect(() => {
     let isCurrent = true;
@@ -233,6 +234,7 @@ export default function DocumentRegister({
       setMessage(
         editingRecordId ? "File record updated." : "File record saved.",
       );
+      if (role === "agent") setActivePanel("records");
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
@@ -429,7 +431,27 @@ export default function DocumentRegister({
       </section>
 
       <div className="grid gap-8 py-6 lg:grid-cols-[minmax(0,1fr)_minmax(380px,0.9fr)]">
-        <section>
+        <div className="grid grid-cols-2 rounded-lg border border-slate-200 bg-white p-1 lg:hidden">
+          <button
+            type="button"
+            onClick={() => setActivePanel("form")}
+            aria-pressed={activePanel === "form"}
+            className={`rounded-md px-3 py-2.5 text-sm font-semibold transition-colors ${activePanel === "form" ? "bg-teal-800 text-white" : "text-slate-600"}`}
+          >
+            Add file
+          </button>
+          <button
+            type="button"
+            onClick={() => setActivePanel("records")}
+            aria-pressed={activePanel === "records"}
+            className={`rounded-md px-3 py-2.5 text-sm font-semibold transition-colors ${activePanel === "records" ? "bg-teal-800 text-white" : "text-slate-600"}`}
+          >
+            {role === "agent" ? "My files" : "Saved files"} ({records.length})
+          </button>
+        </div>
+        <section
+          className={`${activePanel === "form" ? "block" : "hidden"} lg:block rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5`}
+        >
           <div className="mb-4 flex items-center gap-2">
             <FilePlus2 size={18} className="text-teal-800" />
             <h3 className="font-semibold text-slate-900">
@@ -437,7 +459,7 @@ export default function DocumentRegister({
             </h3>
           </div>
           <form onSubmit={handleSave} className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label className="block text-sm font-medium text-slate-700">
                 Agent name
                 <select
@@ -477,7 +499,7 @@ export default function DocumentRegister({
             </label>
 
             <div className="border-y border-slate-200 py-3">
-              <div className="mb-2 flex items-center justify-between">
+              <div className="mb-2 flex flex-wrap items-baseline justify-between gap-1">
                 <h4 className="text-sm font-semibold text-slate-900">
                   Mark missing documents
                 </h4>
@@ -489,7 +511,7 @@ export default function DocumentRegister({
                 {DOCUMENT_TYPES.map((item) => (
                   <label
                     key={item.key}
-                    className="flex cursor-pointer items-center justify-between gap-3 py-2.5"
+                    className="flex min-h-12 cursor-pointer items-center justify-between gap-3 py-2.5"
                   >
                     <span className="text-sm text-slate-700">{item.label}</span>
                     <span className="flex shrink-0 items-center gap-2">
@@ -524,7 +546,7 @@ export default function DocumentRegister({
               <button
                 type="submit"
                 disabled={isSaving}
-                className="inline-flex items-center gap-2 rounded-md bg-teal-800 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-900 disabled:opacity-50"
+                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-teal-800 px-5 py-2.5 text-sm font-semibold text-white hover:bg-teal-900 disabled:opacity-50 sm:w-auto"
               >
                 {editingRecordId ? (
                   <Pencil size={16} />
@@ -551,10 +573,14 @@ export default function DocumentRegister({
           </form>
         </section>
 
-        <section className="border-t border-slate-200 pt-6 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+        <section
+          className={`${activePanel === "records" ? "block" : "hidden"} lg:block rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5`}
+        >
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
             <div>
-              <h3 className="font-semibold text-slate-900">Saved records</h3>
+              <h3 className="font-semibold text-slate-900">
+                {role === "agent" ? "My files" : "Saved records"}
+              </h3>
             </div>
             <label className="relative block w-full sm:w-56">
               <Search
@@ -576,13 +602,13 @@ export default function DocumentRegister({
               No customer files found.
             </p>
           ) : (
-            <div className="divide-y divide-slate-200">
+            <div className="mt-3 space-y-2">
               {prioritizedFilteredRecords.map((record) => {
                 const urgency = getFileUrgency(record, today);
                 return (
                   <article
                     key={record.id}
-                    className="flex items-center justify-between gap-3 py-3"
+                    className="flex min-h-[72px] items-center justify-between gap-3 rounded-md border border-slate-200 px-3 py-3 sm:px-4"
                     style={{ backgroundColor: urgency.backgroundColor }}
                   >
                     <div className="min-w-0">

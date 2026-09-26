@@ -64,8 +64,8 @@ create policy "Users can read their assigned role"
     or public.current_app_role() = 'owner'
   );
 
--- Customer files are shared for reading by the owner and agents. Agents can
--- create records only under their assigned agent name; only the owner edits.
+-- Owners can read all customer files; agents can read only their own records.
+-- Agents can create records only under their assigned name; only owner edits.
 alter table public.customer_files enable row level security;
 drop policy if exists "Users can view their customer files" on public.customer_files;
 drop policy if exists "Users can add their customer files" on public.customer_files;
@@ -75,7 +75,14 @@ drop policy if exists "Users can delete their customer files" on public.customer
 drop policy if exists "Owner and agents can view customer files" on public.customer_files;
 create policy "Owner and agents can view customer files"
   on public.customer_files for select to authenticated
-  using (public.current_app_role() in ('owner', 'agent'));
+  using (
+    public.current_app_role() = 'owner'
+    or (
+      public.current_app_role() = 'agent'
+      and user_id = auth.uid()
+      and agent_name = public.current_agent_name()
+    )
+  );
 
 drop policy if exists "Owner and agents can add customer files" on public.customer_files;
 create policy "Owner and agents can add customer files"
