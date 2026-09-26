@@ -56,16 +56,33 @@ const INITIAL_FORM_STATE = {
   goldCases: 0,
 };
 
+const restoreAmountList = (
+  breakdown: Record<string, unknown> | null | undefined,
+  field: string,
+  fallback: unknown,
+): string[] => {
+  const savedList = breakdown?.[field];
+  if (Array.isArray(savedList)) {
+    return savedList.map((amount) => String(amount ?? ""));
+  }
+  return [String(fallback ?? "")];
+};
+
+const countEnteredAmounts = (amounts: string[]): number =>
+  amounts.filter((amount) => amount.trim() !== "").length;
+
 const DynamicAmountList = ({
   label,
   fieldKey,
   formData,
   setFormData,
+  onFieldEdit,
 }: {
   label: string;
   fieldKey: string;
   formData: any;
   setFormData: any;
+  onFieldEdit?: () => void;
 }) => {
   const values = formData[fieldKey] as string[];
   return (
@@ -80,6 +97,7 @@ const DynamicAmountList = ({
             className="w-full p-3 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500 outline-none"
             value={amount}
             onChange={(e) => {
+              onFieldEdit?.();
               const newList = [...values];
               newList[index] = e.target.value;
               setFormData({ ...formData, [fieldKey]: newList });
@@ -89,12 +107,13 @@ const DynamicAmountList = ({
           />
           {values.length > 1 && (
             <button
-              onClick={() =>
+              onClick={() => {
+                onFieldEdit?.();
                 setFormData({
                   ...formData,
                   [fieldKey]: values.filter((_, i) => i !== index),
-                })
-              }
+                });
+              }}
               className="px-4 bg-red-50 text-red-500 rounded-lg hover:bg-red-100 font-bold transition-colors"
             >
               ✕
@@ -103,9 +122,10 @@ const DynamicAmountList = ({
         </div>
       ))}
       <button
-        onClick={() =>
-          setFormData({ ...formData, [fieldKey]: [...values, ""] })
-        }
+        onClick={() => {
+          onFieldEdit?.();
+          setFormData({ ...formData, [fieldKey]: [...values, ""] });
+        }}
         className="text-sm font-semibold text-blue-600 hover:text-blue-700 mt-1"
       >
         + Add amount
@@ -130,6 +150,14 @@ const Report2Row = ({
   readOnly?: boolean;
 }) => {
   const values = formData[amountKey] as string[];
+  const updateAmounts = (nextValues: string[]) => {
+    setFormData({
+      ...formData,
+      [amountKey]: nextValues,
+      [caseKey]: countEnteredAmounts(nextValues),
+    });
+  };
+
   return (
     <div className="grid grid-cols-12 gap-4 items-start border-b border-gray-100 pb-4 mb-4 last:border-0 last:mb-0 last:pb-0">
       <div className="col-span-3 font-medium text-sm text-gray-700 mt-3">
@@ -139,15 +167,11 @@ const Report2Row = ({
         <input
           type="number"
           min="0"
-          readOnly={readOnly}
-          className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none mt-1 ${readOnly ? "bg-gray-100 text-gray-900" : "bg-gray-50"}`}
-          value={(formData as any)[caseKey] || ""}
-          onChange={(e) => {
-            if (readOnly) return;
-            setFormData({ ...formData, [caseKey]: Number(e.target.value) });
-          }}
+          readOnly
+          className="w-full p-3 border rounded-lg bg-gray-100 text-gray-900 outline-none mt-1"
+          value={(formData as any)[caseKey] ?? 0}
           onWheel={(e) => (e.target as HTMLInputElement).blur()}
-          placeholder="Cases"
+          aria-label={`${label} case count`}
         />
       </div>
       <div className="col-span-6 space-y-2 mt-1">
@@ -162,7 +186,7 @@ const Report2Row = ({
                 if (readOnly) return;
                 const newList = [...values];
                 newList[index] = e.target.value;
-                setFormData({ ...formData, [amountKey]: newList });
+                updateAmounts(newList);
               }}
               onWheel={(e) => (e.target as HTMLInputElement).blur()}
               placeholder="Amount (₹)"
@@ -170,10 +194,7 @@ const Report2Row = ({
             {values.length > 1 && (
               <button
                 onClick={() =>
-                  setFormData({
-                    ...formData,
-                    [amountKey]: values.filter((_, i) => i !== index),
-                  })
+                  updateAmounts(values.filter((_, i) => i !== index))
                 }
                 className="px-3 bg-red-50 text-red-500 rounded hover:bg-red-100 font-bold"
               >
@@ -184,9 +205,7 @@ const Report2Row = ({
         ))}
         {!readOnly && (
           <button
-            onClick={() =>
-              setFormData({ ...formData, [amountKey]: [...values, ""] })
-            }
+            onClick={() => updateAmounts([...values, ""])}
             className="text-xs font-semibold text-blue-600 hover:text-blue-700"
           >
             + Add amount
@@ -221,6 +240,10 @@ export default function ReportForm() {
 
   const [showPreview, setShowPreview] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingReport, setIsLoadingReport] = useState(false);
+  const [reportLoadMessage, setReportLoadMessage] = useState("");
+  const [isViewingSavedReport, setIsViewingSavedReport] = useState(false);
+  const preserveLoadedGoldValues = useRef(false);
 
   const [isMounted, setIsMounted] = useState(false);
   const [showMtdInputs, setShowMtdInputs] = useState(false);
@@ -417,22 +440,24 @@ export default function ReportForm() {
       setFormData((prev) => ({ ...prev, expiredBalance: newBalance }));
     }
 
-    const daySanctionAmount = String(sanction);
-    if (
-      formData.goldAmount.length !== 1 ||
-      formData.goldAmount[0] !== daySanctionAmount
-    ) {
-      setFormData((prev) => ({
-        ...prev,
-        goldAmount: [daySanctionAmount],
-      }));
-    }
+    if (!preserveLoadedGoldValues.current) {
+      const daySanctionAmount = String(sanction);
+      if (
+        formData.goldAmount.length !== 1 ||
+        formData.goldAmount[0] !== daySanctionAmount
+      ) {
+        setFormData((prev) => ({
+          ...prev,
+          goldAmount: [daySanctionAmount],
+        }));
+      }
 
-    if (formData.goldCases !== freshBusinessCases) {
-      setFormData((prev) => ({
-        ...prev,
-        goldCases: freshBusinessCases,
-      }));
+      if (formData.goldCases !== freshBusinessCases) {
+        setFormData((prev) => ({
+          ...prev,
+          goldCases: freshBusinessCases,
+        }));
+      }
     }
   }, [formData]);
 
@@ -471,6 +496,18 @@ export default function ReportForm() {
         fresh_business: sumAmountList(formData.freshBusiness),
         renewal_business: sumAmountList(formData.renewalBusiness),
         gl_redemption: sumAmountList(formData.glRedemption),
+        amount_breakdown: {
+          freshBusiness: formData.freshBusiness,
+          renewalBusiness: formData.renewalBusiness,
+          glRedemption: formData.glRedemption,
+          convertedAmount: formData.convertedAmount,
+          newTwAmount: formData.newTwAmount,
+          ehTwAmount: formData.ehTwAmount,
+          usedTwAmount: formData.usedTwAmount,
+          splAmount: formData.splAmount,
+          csplAmount: formData.csplAmount,
+          goldAmount: formData.goldAmount,
+        },
 
         expired_agreements: formData.expiredAgreements || 0,
         expired_renewed: formData.expiredRenewed || 0,
@@ -484,15 +521,15 @@ export default function ReportForm() {
 
         new_customers: formData.newCustomers || 0,
 
-        new_tw_cases: formData.newTwCases || 0,
+        new_tw_cases: countEnteredAmounts(formData.newTwAmount),
         new_tw_amount: sumAmountList(formData.newTwAmount),
-        eh_tw_cases: formData.ehTwCases || 0,
+        eh_tw_cases: countEnteredAmounts(formData.ehTwAmount),
         eh_tw_amount: sumAmountList(formData.ehTwAmount),
-        used_tw_cases: formData.usedTwCases || 0,
+        used_tw_cases: countEnteredAmounts(formData.usedTwAmount),
         used_tw_amount: sumAmountList(formData.usedTwAmount),
-        spl_cases: formData.splCases || 0,
+        spl_cases: countEnteredAmounts(formData.splAmount),
         spl_amount: sumAmountList(formData.splAmount),
-        cspl_cases: formData.csplCases || 0,
+        cspl_cases: countEnteredAmounts(formData.csplAmount),
         cspl_amount: sumAmountList(formData.csplAmount),
         gold_cases: formData.goldCases || 0,
         gold_amount: sumAmountList(formData.goldAmount),
@@ -513,7 +550,7 @@ export default function ReportForm() {
           console.warn("Unable to clear saved draft:", error);
         }
       }
-      skipNextDraftSave.current = true;
+      skipNextDraftSave.current = !isViewingSavedReport;
 
       setShowMtdInputs(false);
 
@@ -522,19 +559,21 @@ export default function ReportForm() {
 
       setShowPreview(true);
 
-      setFormData((prev) => ({
-        ...INITIAL_FORM_STATE,
-        date: new Date().toISOString().split("T")[0],
-        branchName: prev.branchName,
-        jeName: prev.jeName,
-        firstKey: prev.firstKey,
-        secondKey: prev.secondKey,
-        // Carry forward the newly calculated MTD for immediate view without page reload
-        prevMonthFresh: derived.monthFresh,
-        prevMonthRenewal: derived.monthRenewal,
-        prevMonthRedemption: derived.monthRedemption,
-        prevPjbtData: derived.totalPjbtData,
-      }));
+      if (!isViewingSavedReport) {
+        setFormData((prev) => ({
+          ...INITIAL_FORM_STATE,
+          date: new Date().toISOString().split("T")[0],
+          branchName: prev.branchName,
+          jeName: prev.jeName,
+          firstKey: prev.firstKey,
+          secondKey: prev.secondKey,
+          // Carry forward the newly calculated MTD for immediate view without page reload
+          prevMonthFresh: derived.monthFresh,
+          prevMonthRenewal: derived.monthRenewal,
+          prevMonthRedemption: derived.monthRedemption,
+          prevPjbtData: derived.totalPjbtData,
+        }));
+      }
     } catch (error: any) {
       console.error("Save error:", error);
       alert("❌ Failed to save: " + error.message);
@@ -547,6 +586,152 @@ export default function ReportForm() {
     setShowPreview(false);
     setSavedReport1Snapshot("");
     setSavedReport2Snapshot("");
+  };
+
+  const handleDateChange = async (selectedDate: string) => {
+    if (!selectedDate) return;
+
+    setFormData((current) => ({
+      ...INITIAL_FORM_STATE,
+      date: selectedDate,
+      branchName: current.branchName,
+      jeName: current.jeName,
+      firstKey: current.firstKey,
+      secondKey: current.secondKey,
+    }));
+    setIsViewingSavedReport(false);
+    setIsLoadingReport(true);
+    setReportLoadMessage("Loading report...");
+    setShowMtdInputs(true);
+    preserveLoadedGoldValues.current = false;
+
+    try {
+      if (!isSupabaseConfigured || !supabase) {
+        setReportLoadMessage("Supabase is not configured.");
+        return;
+      }
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        setReportLoadMessage("Log in to load saved reports.");
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("daily_reports")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("date", selectedDate)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (!data) {
+        preserveLoadedGoldValues.current = false;
+        setFormData((current) => ({
+          ...INITIAL_FORM_STATE,
+          date: selectedDate,
+          branchName: current.branchName,
+          jeName: current.jeName,
+          firstKey: current.firstKey,
+          secondKey: current.secondKey,
+        }));
+        setShowMtdInputs(true);
+        setReportLoadMessage(
+          "No saved report for this date. Blank report is ready.",
+        );
+        return;
+      }
+
+      preserveLoadedGoldValues.current = true;
+      setFormData({
+        ...INITIAL_FORM_STATE,
+        date: selectedDate,
+        branchName: data.branch_name ?? "",
+        jeName: data.je_name ?? "",
+        firstKey: data.first_key ?? "",
+        secondKey: data.second_key ?? "",
+        prevMonthFresh: Number(data.prev_month_fresh ?? 0),
+        prevMonthRenewal: Number(data.prev_month_renewal ?? 0),
+        prevMonthRedemption: Number(data.prev_month_redemption ?? 0),
+        prevPjbtData: Number(data.prev_pjbt_data ?? 0),
+        freshBusiness: restoreAmountList(
+          data.amount_breakdown,
+          "freshBusiness",
+          data.fresh_business,
+        ),
+        renewalBusiness: restoreAmountList(
+          data.amount_breakdown,
+          "renewalBusiness",
+          data.renewal_business,
+        ),
+        glRedemption: restoreAmountList(
+          data.amount_breakdown,
+          "glRedemption",
+          data.gl_redemption,
+        ),
+        convertedAmount: restoreAmountList(
+          data.amount_breakdown,
+          "convertedAmount",
+          data.converted_amount,
+        ),
+        expiredAgreements: Number(data.expired_agreements ?? 0),
+        expiredRenewed: Number(data.expired_renewed ?? 0),
+        todayRenewed: Number(data.today_renewed ?? 0),
+        expiredBalance: Number(data.expired_balance ?? 0),
+        autoCalculateBalance: false,
+        pjbtData: Number(data.pjbt_data ?? 0),
+        calls: Number(data.calls ?? 0),
+        converted: Number(data.converted ?? 0),
+        newCustomers: Number(data.new_customers ?? 0),
+        newTwCases: Number(data.new_tw_cases ?? 0),
+        newTwAmount: restoreAmountList(
+          data.amount_breakdown,
+          "newTwAmount",
+          data.new_tw_amount,
+        ),
+        ehTwCases: Number(data.eh_tw_cases ?? 0),
+        ehTwAmount: restoreAmountList(
+          data.amount_breakdown,
+          "ehTwAmount",
+          data.eh_tw_amount,
+        ),
+        usedTwCases: Number(data.used_tw_cases ?? 0),
+        usedTwAmount: restoreAmountList(
+          data.amount_breakdown,
+          "usedTwAmount",
+          data.used_tw_amount,
+        ),
+        splCases: Number(data.spl_cases ?? 0),
+        splAmount: restoreAmountList(
+          data.amount_breakdown,
+          "splAmount",
+          data.spl_amount,
+        ),
+        csplCases: Number(data.cspl_cases ?? 0),
+        csplAmount: restoreAmountList(
+          data.amount_breakdown,
+          "csplAmount",
+          data.cspl_amount,
+        ),
+        goldCases: Number(data.gold_cases ?? 0),
+        goldAmount: restoreAmountList(
+          data.amount_breakdown,
+          "goldAmount",
+          data.gold_amount,
+        ),
+      });
+      setIsViewingSavedReport(true);
+      setShowMtdInputs(true);
+      setReportLoadMessage("Saved report loaded.");
+    } catch (error) {
+      console.error("Unable to load report:", error);
+      setReportLoadMessage("Could not load this report. Please try again.");
+    } finally {
+      setIsLoadingReport(false);
+    }
   };
 
   return (
@@ -563,12 +748,16 @@ export default function ReportForm() {
             </label>
             <input
               type="date"
-              className="w-full p-3 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500 outline-none"
+              disabled={isLoadingReport}
+              className="w-full p-3 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-60"
               value={formData.date}
-              onChange={(e) =>
-                setFormData({ ...formData, date: e.target.value })
-              }
+              onChange={(e) => handleDateChange(e.target.value)}
             />
+            {reportLoadMessage && (
+              <p className="text-xs text-gray-500 mt-1" role="status">
+                {isLoadingReport ? "Loading report..." : reportLoadMessage}
+              </p>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-600 mb-1">
@@ -744,6 +933,9 @@ export default function ReportForm() {
           fieldKey="freshBusiness"
           formData={formData}
           setFormData={setFormData}
+          onFieldEdit={() => {
+            preserveLoadedGoldValues.current = false;
+          }}
         />
         <DynamicAmountList
           label="Today's Renewal Business Amount(s)"
@@ -1060,6 +1252,41 @@ export default function ReportForm() {
               </span>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section
+        aria-label="Month-to-date balance summary"
+        className="bg-white p-5 rounded-xl shadow-sm border border-gray-200"
+      >
+        <h2 className="font-bold text-lg mb-3 text-gray-800">
+          MTD Balance Summary
+        </h2>
+        <div className="space-y-2 text-sm text-gray-600">
+          <p>
+            Fresh Business: {formatIndianCurrency(formData.prevMonthFresh)} +{" "}
+            {formatIndianCurrency(derived.totalFresh)} today ={" "}
+            <strong className="text-gray-900">
+              {" "}
+              {formatIndianCurrency(derived.monthFresh)}
+            </strong>
+          </p>
+          <p>
+            Renewal: {formatIndianCurrency(formData.prevMonthRenewal)} +{" "}
+            {formatIndianCurrency(derived.totalRenewal)} today ={" "}
+            <strong className="text-gray-900">
+              {" "}
+              {formatIndianCurrency(derived.monthRenewal)}
+            </strong>
+          </p>
+          <p>
+            GL Redemption: {formatIndianCurrency(formData.prevMonthRedemption)}{" "}
+            + {formatIndianCurrency(derived.totalRedemption)} today ={" "}
+            <strong className="text-gray-900">
+              {" "}
+              {formatIndianCurrency(derived.monthRedemption)}
+            </strong>
+          </p>
         </div>
       </section>
 
