@@ -205,21 +205,32 @@ export default function DocumentRegister({
 
     try {
       const recordData = {
-        user_id: user.id,
         agent_name: agentName.trim(),
         customer_name: customerName.trim(),
         file_date: fileDate,
         documents,
       };
-      const { error } = editingRecordId
-        ? await supabase
-            .from("customer_files")
-            .update(recordData)
-            .eq("id", editingRecordId)
-            .eq("user_id", user.id)
-        : await supabase.from("customer_files").insert(recordData);
-      if (error) throw error;
+      if (editingRecordId) {
+        const { data: updatedRecord, error } = await supabase
+          .from("customer_files")
+          .update(recordData)
+          .eq("id", editingRecordId)
+          .select("id")
+          .maybeSingle();
+        if (error) throw error;
+        if (!updatedRecord) {
+          throw new Error(
+            "No record was updated. Check that you are signed in as the owner and that the access migration has been applied.",
+          );
+        }
+      } else {
+        const { error } = await supabase
+          .from("customer_files")
+          .insert({ ...recordData, user_id: user.id });
+        if (error) throw error;
+      }
 
+      const wasEditing = editingRecordId !== null;
       setAgentName(role === "agent" ? (assignedAgent ?? "") : "");
       setCustomerName("");
       setFileDate(new Date().toISOString().slice(0, 10));
@@ -231,10 +242,8 @@ export default function DocumentRegister({
         .order("file_date", { ascending: false });
       if (refreshError) throw refreshError;
       setRecords((data ?? []) as CustomerFileRecord[]);
-      setMessage(
-        editingRecordId ? "File record updated." : "File record saved.",
-      );
-      if (role === "agent") setActivePanel("records");
+      setMessage(wasEditing ? "File record updated." : "File record saved.");
+      if (role === "agent" || wasEditing) setActivePanel("records");
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
@@ -245,6 +254,7 @@ export default function DocumentRegister({
   };
 
   const startEditing = (record: CustomerFileRecord) => {
+    setActivePanel("form");
     setEditingRecordId(record.id);
     setAgentName(record.agent_name);
     setCustomerName(record.customer_name);
