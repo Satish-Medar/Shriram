@@ -318,9 +318,10 @@ export default function ReportForm() {
             Number(data.prev_pjbt_data || 0) + Number(data.pjbt_data || 0);
         }
 
-        // Apply profile names and calculated MTD from DB
+        // Restore draft fields, then keep the database-derived MTD balances authoritative.
         setFormData((prev) => ({
           ...prev,
+          ...savedDraft,
           branchName: data.branch_name || prev.branchName,
           jeName: data.je_name || prev.jeName,
           firstKey: data.first_key || prev.firstKey,
@@ -329,7 +330,6 @@ export default function ReportForm() {
           prevMonthRenewal: newPrevRenewal,
           prevMonthRedemption: newPrevRedemption,
           prevPjbtData: newPrevPjbt,
-          ...savedDraft,
         }));
 
         // Only show the box if the calculated DB totals are absolutely 0
